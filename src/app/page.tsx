@@ -3,94 +3,27 @@
 import React, { useState } from 'react';
 import { FormConfigProvider, useFormConfig } from '@/lib/form-config/hooks';
 import { FormConfigEditor } from '@/components/admin/FormConfigEditor';
-import { ConfiguredForm, createConfiguredForm } from '@/components/forms/ConfiguredForm';
-import { FormSchema } from '@/lib/form-config/types';
-
-const patientRegistrationSchema: FormSchema = {
-  formKey: 'patient_registration',
-  formName: 'Patient Registration',
-  description: 'New patient registration form',
-  groups: [
-    { id: 'personal', name: 'personal', label: 'Personal Information' },
-    { id: 'contact', name: 'contact', label: 'Contact Details' },
-    { id: 'medical', name: 'medical', label: 'Medical History' },
-  ],
-  fields: [
-    { id: 'firstName', name: 'firstName', label: 'First Name', type: 'text', placeholder: 'Enter first name', validation: { required: true }, groupId: 'personal', groupLabel: 'Personal Information' },
-    { id: 'lastName', name: 'lastName', label: 'Last Name', type: 'text', placeholder: 'Enter last name', validation: { required: true }, groupId: 'personal', groupLabel: 'Personal Information' },
-    { id: 'dateOfBirth', name: 'dateOfBirth', label: 'Date of Birth', type: 'date', validation: { required: true }, groupId: 'personal', groupLabel: 'Personal Information' },
-    { id: 'gender', name: 'gender', label: 'Gender', type: 'select', options: [
-      { label: 'Male', value: 'male' },
-      { label: 'Female', value: 'female' },
-      { label: 'Other', value: 'other' },
-    ], groupId: 'personal', groupLabel: 'Personal Information' },
-    { id: 'email', name: 'email', label: 'Email', type: 'email', placeholder: 'email@example.com', groupId: 'contact', groupLabel: 'Contact Details' },
-    { id: 'phone', name: 'phone', label: 'Phone Number', type: 'tel', placeholder: '123-456-7890', validation: { required: true }, groupId: 'contact', groupLabel: 'Contact Details' },
-    { id: 'address', name: 'address', label: 'Address', type: 'textarea', placeholder: 'Enter address', groupId: 'contact', groupLabel: 'Contact Details' },
-    { id: 'emergencyContact', name: 'emergencyContact', label: 'Emergency Contact Name', type: 'text', groupId: 'contact', groupLabel: 'Contact Details' },
-    { id: 'emergencyPhone', name: 'emergencyPhone', label: 'Emergency Contact Phone', type: 'tel', groupId: 'contact', groupLabel: 'Contact Details' },
-    { id: 'bloodType', name: 'bloodType', label: 'Blood Type', type: 'select', options: [
-      { label: 'A+', value: 'A+' },
-      { label: 'A-', value: 'A-' },
-      { label: 'B+', value: 'B+' },
-      { label: 'B-', value: 'B-' },
-      { label: 'O+', value: 'O+' },
-      { label: 'O-', value: 'O-' },
-      { label: 'AB+', value: 'AB+' },
-      { label: 'AB-', value: 'AB-' },
-    ], groupId: 'medical', groupLabel: 'Medical History' },
-    { id: 'allergies', name: 'allergies', label: 'Known Allergies', type: 'textarea', placeholder: 'List any allergies', groupId: 'medical', groupLabel: 'Medical History' },
-    { id: 'medications', name: 'medications', label: 'Current Medications', type: 'textarea', placeholder: 'List current medications', groupId: 'medical', groupLabel: 'Medical History' },
-  ],
-};
-
-const generalConsultationSchema: FormSchema = {
-  formKey: 'general_consultation',
-  formName: 'General Consultation',
-  description: 'General consultation form for patients',
-  groups: [
-    { id: 'vitals', name: 'vitals', label: 'Vital Signs' },
-    { id: 'symptoms', name: 'symptoms', label: 'Symptoms' },
-    { id: 'assessment', name: 'assessment', label: 'Assessment' },
-  ],
-  fields: [
-    { id: 'consultationDate', name: 'consultationDate', label: 'Consultation Date', type: 'datetime', validation: { required: true }, groupId: 'vitals', groupLabel: 'Vital Signs' },
-    { id: 'temperature', name: 'temperature', label: 'Temperature (°F)', type: 'number', placeholder: '98.6', validation: { required: true, min: 94, max: 108 }, groupId: 'vitals', groupLabel: 'Vital Signs' },
-    { id: 'bloodPressure', name: 'bloodPressure', label: 'Blood Pressure', type: 'text', placeholder: '120/80', validation: { required: true }, groupId: 'vitals', groupLabel: 'Vital Signs' },
-    { id: 'heartRate', name: 'heartRate', label: 'Heart Rate (bpm)', type: 'number', placeholder: '72', validation: { required: true, min: 30, max: 220 }, groupId: 'vitals', groupLabel: 'Vital Signs' },
-    { id: 'respiratoryRate', name: 'respiratoryRate', label: 'Respiratory Rate', type: 'number', placeholder: '16', groupId: 'vitals', groupLabel: 'Vital Signs' },
-    { id: 'oxygenSaturation', name: 'oxygenSaturation', label: 'Oxygen Saturation (%)', type: 'number', placeholder: '98', groupId: 'vitals', groupLabel: 'Vital Signs' },
-    { id: 'chiefComplaint', name: 'chiefComplaint', label: 'Chief Complaint', type: 'textarea', validation: { required: true }, groupId: 'symptoms', groupLabel: 'Symptoms' },
-    { id: 'symptomDuration', name: 'symptomDuration', label: 'Symptom Duration', type: 'text', placeholder: 'e.g., 3 days', groupId: 'symptoms', groupLabel: 'Symptoms' },
-    { id: 'symptomSeverity', name: 'symptomSeverity', label: 'Severity', type: 'select', options: [
-      { label: 'Mild', value: 'mild' },
-      { label: 'Moderate', value: 'moderate' },
-      { label: 'Severe', value: 'severe' },
-    ], groupId: 'symptoms', groupLabel: 'Symptoms' },
-    { id: 'additionalSymptoms', name: 'additionalSymptoms', label: 'Additional Symptoms', type: 'textarea', groupId: 'symptoms', groupLabel: 'Symptoms' },
-    { id: 'physicalExam', name: 'physicalExam', label: 'Physical Examination Notes', type: 'textarea', groupId: 'assessment', groupLabel: 'Assessment' },
-    { id: 'diagnosis', name: 'diagnosis', label: 'Diagnosis', type: 'textarea', validation: { required: true }, groupId: 'assessment', groupLabel: 'Assessment' },
-    { id: 'treatmentPlan', name: 'treatmentPlan', label: 'Treatment Plan', type: 'textarea', groupId: 'assessment', groupLabel: 'Assessment' },
-    { id: 'followUpDate', name: 'followUpDate', label: 'Follow-up Date', type: 'date', groupId: 'assessment', groupLabel: 'Assessment' },
-  ],
-};
+import { 
+  PatientRegistrationForm, 
+  GeneralConsultationForm, 
+  AdmissionForm, 
+  VitalsForm, 
+  SettingsForm,
+  allFormSchemas,
+  formOptions
+} from '@/components/forms/form-definitions';
 
 function SchemaRegistration() {
   const { registerSchema } = useFormConfig();
   
-  useState(() => {
-    registerSchema(patientRegistrationSchema);
-    registerSchema(generalConsultationSchema);
-  });
+  React.useEffect(() => {
+    allFormSchemas.forEach(schema => {
+      registerSchema(schema);
+    });
+  }, [registerSchema]);
 
   return null;
 }
-
-const PatientRegistrationForm = createConfiguredForm(patientRegistrationSchema);
-const AdmissionForm = createConfiguredForm('admission');
-const VitalsForm = createConfiguredForm('vitals');
-const SettingsForm = createConfiguredForm('settings');
-const GeneralConsultationForm = createConfiguredForm(generalConsultationSchema);
 
 function AdminPanel() {
   const { configs, activateConfig, loading, customConfigs, activeCustomConfigId, saveCustomConfig, deleteCustomConfig, loadCustomConfig } = useFormConfig();
@@ -349,14 +282,6 @@ function FormDemo() {
   const [activeForm, setActiveForm] = useState<string>('patient_registration');
   const [submittedData, setSubmittedData] = useState<Record<string, unknown> | null>(null);
 
-  const forms = [
-    { key: 'patient_registration', label: 'Patient Registration' },
-    { key: 'general_consultation', label: 'General Consultation' },
-    { key: 'admission', label: 'Admission Form' },
-    { key: 'vitals', label: 'Vitals Sign' },
-    { key: 'settings', label: 'Settings' },
-  ];
-
   const renderForm = () => {
     switch (activeForm) {
       case 'patient_registration':
@@ -379,7 +304,7 @@ function FormDemo() {
       <h2 className="text-xl font-bold mb-4">Form Preview</h2>
       
       <div className="form-tabs flex gap-2 mb-4 border-b pb-2">
-        {forms.map(form => (
+        {formOptions.map(form => (
           <button
             key={form.key}
             onClick={() => setActiveForm(form.key)}
