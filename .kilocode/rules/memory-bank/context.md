@@ -2,7 +2,7 @@
 
 ## Current State
 
-A dynamic form configuration system for healthcare/clinical applications with field management and system activation functions. Now supports schema-based field auto-discovery.
+A dynamic form configuration system for healthcare/clinical applications with field management and system activation functions. Now supports schema-based field auto-discovery and custom facility configurations.
 
 ## Recently Completed
 
@@ -16,18 +16,34 @@ A dynamic form configuration system for healthcare/clinical applications with fi
 - [x] Admin UI for managing fields, groups, and system activations
 - [x] Schema-based field auto-discovery - forms can define their fields programmatically
 - [x] Auto-creation of config from schema when form loads
+- [x] Custom configuration support with named configs
+- [x] Default facility type configs: Default (Full), PHC, General Hospital, FMC, FTH, Private Clinic
 
 ## Current Structure
 
 | File/Directory | Purpose | Status |
 |----------------|---------|--------|
-| `src/lib/form-config/types.ts` | Type definitions (FormFieldConfig, FieldGroupConfig, SystemFunctionActivation, FormSchema) | ✅ |
-| `src/lib/form-config/service.ts` | Business logic, localStorage persistence, form registry | ✅ |
-| `src/lib/form-config/hooks.tsx` | React context & hooks, registerSchema, getConfigWithSchema | ✅ |
+| `src/lib/form-config/types.ts` | Type definitions (FormFieldConfig, FieldGroupConfig, SystemFunctionActivation, FormSchema, CustomConfig, FacilityType) | ✅ |
+| `src/lib/form-config/service.ts` | Business logic, localStorage persistence, form registry, custom config management | ✅ |
+| `src/lib/form-config/hooks.tsx` | React context & hooks, registerSchema, getConfigWithSchema, custom config handlers | ✅ |
 | `src/components/admin/FormConfigEditor.tsx` | Admin UI for form configuration | ✅ |
 | `src/components/forms/ConfiguredForm.tsx` | Dynamic form renderer, createConfiguredForm with schema | ✅ |
 
 ## Key Features
+
+### Custom Configurations
+- Save current form configurations with custom name
+- Choose facility type: Default, PHC, General Hospital, FMC, FTH, Private Clinic
+- Set as default configuration
+- Load/delete saved configurations in admin panel
+
+### Default Facility Configurations
+1. **Default (Full)** - Full metadata with all fields enabled
+2. **PHC** - Primary Health Centre - Basic essential fields only
+3. **General Hospital** - Full hospital with all departments
+4. **FMC** - Federal Medical Centre - Comprehensive with specialist support
+5. **FTH** - Federal Teaching Hospital - Full academic hospital setup
+6. **Private Clinic** - Personalized care with essential fields
 
 ### Schema-Based Forms
 Define form fields programmatically using `FormSchema`:
@@ -69,3 +85,4 @@ const MyForm = createConfiguredForm(myFormSchema);
 | Initial | Template created with base setup |
 | 2026-03-13 | Added field removal toggle and System Activation Functions with field metadata |
 | 2026-03-13 | Added schema-based auto-discovery for dynamic form configuration |
+| 2026-03-13 | Added custom configuration support with facility types |
