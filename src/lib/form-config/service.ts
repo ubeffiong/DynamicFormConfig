@@ -1,4 +1,4 @@
-import { FormConfig, FormConfigSummary, BackendFormConfig, FormFieldConfig, FieldGroupConfig, SystemFunctionActivation } from './types';
+import { FormConfig, FormConfigSummary, BackendFormConfig, FormFieldConfig, FieldGroupConfig, SystemFunctionActivation, FormSchema } from './types';
 
 const STORAGE_KEY = 'form_configs';
 const ACTIVE_FUNCTIONS_KEY = 'active_system_functions';
@@ -38,6 +38,89 @@ export function setActiveSystemFunctions(functions: string[]): void {
   if (typeof window !== 'undefined') {
     localStorage.setItem(ACTIVE_FUNCTIONS_KEY, JSON.stringify(functions));
   }
+}
+
+const registeredSchemas = new Map<string, FormSchema>();
+
+export function registerFormSchema(schema: FormSchema): void {
+  registeredSchemas.set(schema.formKey, schema);
+}
+
+export function getRegisteredSchemas(): FormSchema[] {
+  return Array.from(registeredSchemas.values());
+}
+
+export function getRegisteredSchema(formKey: string): FormSchema | undefined {
+  return registeredSchemas.get(formKey);
+}
+
+export function unregisterFormSchema(formKey: string): void {
+  registeredSchemas.delete(formKey);
+}
+
+export async function getOrCreateConfigFromSchema(formKey: string): Promise<FormConfig | null> {
+  const schema = getRegisteredSchema(formKey);
+  if (!schema) {
+    return fetchFormConfigByKey(formKey);
+  }
+
+  let config = await fetchFormConfigByKey(formKey);
+  
+  if (!config) {
+    config = {
+      id: `${formKey}-config`,
+      formName: schema.formName,
+      formKey: schema.formKey,
+      description: schema.description,
+      version: 1,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      groups: schema.groups.map((g, idx) => ({
+        ...g,
+        visibility: 'visible',
+        order: idx + 1,
+      })),
+      fields: schema.fields.map((f, idx) => ({
+        ...f,
+        visibility: 'visible',
+        order: idx + 1,
+      })),
+      systemActivations: [],
+    };
+    await saveFormConfig(config);
+  } else {
+    const existingFieldIds = new Set(config.fields.map(f => f.id));
+    const existingGroupIds = new Set(config.groups.map(g => g.id));
+    
+    const newFields = schema.fields
+      .filter(f => !existingFieldIds.has(f.id))
+      .map((f, idx) => ({
+        ...f,
+        visibility: 'visible' as const,
+        order: config!.fields.length + idx + 1,
+      }));
+    
+    const newGroups = schema.groups
+      .filter(g => !existingGroupIds.has(g.id))
+      .map((g, idx) => ({
+        ...g,
+        visibility: 'visible' as const,
+        order: config!.groups.length + idx + 1,
+      }));
+    
+    if (newFields.length > 0 || newGroups.length > 0) {
+      config = {
+        ...config,
+        fields: [...config.fields, ...newFields],
+        groups: [...config.groups, ...newGroups],
+        updatedAt: new Date().toISOString(),
+      };
+      await saveFormConfig(config);
+    }
+  }
+  
+  return config;
 }
 
 export async function fetchFormConfigs(): Promise<BackendFormConfig> {

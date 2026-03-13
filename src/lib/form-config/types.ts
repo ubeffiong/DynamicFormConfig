@@ -112,6 +112,35 @@ export interface BackendFormConfig {
   activeFormKeys: string[];
 }
 
+export interface FormFieldSchema {
+  id: string;
+  name: string;
+  label: string;
+  type: FieldType;
+  placeholder?: string;
+  defaultValue?: unknown;
+  options?: SelectOption[];
+  validation?: FieldValidation;
+  groupId?: string;
+  groupLabel?: string;
+}
+
+export interface FormGroupSchema {
+  id: string;
+  name: string;
+  label: string;
+  collapsible?: boolean;
+  collapsed?: boolean;
+}
+
+export interface FormSchema {
+  formKey: string;
+  formName: string;
+  description?: string;
+  groups: FormGroupSchema[];
+  fields: FormFieldSchema[];
+}
+
 export function getDefaultFieldConfig(
   id: string,
   name: string,

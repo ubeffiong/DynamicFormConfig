@@ -11,14 +11,14 @@ interface FormConfigEditorProps {
 }
 
 export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditorProps) {
-  const { getConfig, saveConfig, loading } = useFormConfig();
+  const { getConfigWithSchema, saveConfig, loading } = useFormConfig();
   const [config, setConfig] = useState<FormConfig | null>(null);
   const [activeTab, setActiveTab] = useState<'fields' | 'groups' | 'activations'>('fields');
 
   useEffect(() => {
     async function load() {
       if (formKey) {
-        const cfg = await getConfig(formKey);
+        const cfg = await getConfigWithSchema(formKey);
         if (cfg) {
           setConfig({ ...cfg, fields: [...cfg.fields], groups: [...cfg.groups], systemActivations: [...cfg.systemActivations] });
         }
@@ -38,7 +38,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
       }
     }
     load();
-  }, [formKey, getConfig]);
+  }, [formKey, getConfigWithSchema]);
 
   const handleSave = async () => {
     if (config) {

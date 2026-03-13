@@ -7,6 +7,7 @@ import {
   BackendFormConfig,
   FormFieldConfig,
   FieldGroupConfig,
+  FormSchema,
 } from './types';
 import {
   fetchFormConfigs,
@@ -19,6 +20,8 @@ import {
   getActiveSystemFunctions,
   setActiveSystemFunctions,
   initializeSampleConfigs,
+  registerFormSchema,
+  getOrCreateConfigFromSchema,
 } from './service';
 
 interface FormConfigContextValue {
@@ -27,11 +30,13 @@ interface FormConfigContextValue {
   error: string | null;
   refreshConfigs: () => Promise<void>;
   getConfig: (formKey: string) => Promise<FormConfig | null>;
+  getConfigWithSchema: (formKey: string) => Promise<FormConfig | null>;
   saveConfig: (config: FormConfig) => Promise<FormConfig>;
   deleteConfig: (configId: string) => Promise<void>;
   activateConfig: (formKey: string, active: boolean) => Promise<void>;
   getActiveFunctions: () => string[];
   setActiveFunctions: (functions: string[]) => void;
+  registerSchema: (schema: FormSchema) => void;
   applyConfig: (
     formKey: string,
     formData: Record<string, unknown>,
@@ -95,12 +100,20 @@ export function FormConfigProvider({ children }: { children: ReactNode }) {
     setActiveFunctionsState(functions);
   }, []);
 
+  const registerSchema = useCallback((schema: FormSchema) => {
+    registerFormSchema(schema);
+  }, []);
+
+  const getConfigWithSchema = useCallback(async (formKey: string): Promise<FormConfig | null> => {
+    return getOrCreateConfigFromSchema(formKey);
+  }, []);
+
   const applyConfig = useCallback(async (
     formKey: string,
     formData: Record<string, unknown>,
     backendRequired: string[] = []
   ): Promise<{ fields: FormFieldConfig[]; groups: FieldGroupConfig[] }> => {
-    const config = await fetchFormConfigByKey(formKey);
+    const config = await getOrCreateConfigFromSchema(formKey);
     if (!config) {
       throw new Error(`Configuration not found for form: ${formKey}`);
     }
@@ -119,11 +132,13 @@ export function FormConfigProvider({ children }: { children: ReactNode }) {
         error,
         refreshConfigs,
         getConfig,
+        getConfigWithSchema,
         saveConfig: saveConfigHandler,
         deleteConfig: deleteConfigHandler,
         activateConfig: activateConfigHandler,
         getActiveFunctions,
         setActiveFunctions: setActiveFunctionsHandler,
+        registerSchema,
         applyConfig,
       }}
     >

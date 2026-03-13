@@ -2,9 +2,7 @@
 
 ## Current State
 
-**Template Status**: ✅ Ready for development
-
-A dynamic form configuration system for healthcare/clinical applications with field management and system activation functions.
+A dynamic form configuration system for healthcare/clinical applications with field management and system activation functions. Now supports schema-based field auto-discovery.
 
 ## Recently Completed
 
@@ -16,18 +14,40 @@ A dynamic form configuration system for healthcare/clinical applications with fi
 - [x] Group removal toggle (isRemoved flag)
 - [x] System Activation Functions with field/group metadata control
 - [x] Admin UI for managing fields, groups, and system activations
+- [x] Schema-based field auto-discovery - forms can define their fields programmatically
+- [x] Auto-creation of config from schema when form loads
 
 ## Current Structure
 
 | File/Directory | Purpose | Status |
 |----------------|---------|--------|
-| `src/lib/form-config/types.ts` | Type definitions (FormFieldConfig, FieldGroupConfig, SystemFunctionActivation) | ✅ |
-| `src/lib/form-config/service.ts` | Business logic, localStorage persistence | ✅ |
-| `src/lib/form-config/hooks.tsx` | React context & hooks | ✅ |
+| `src/lib/form-config/types.ts` | Type definitions (FormFieldConfig, FieldGroupConfig, SystemFunctionActivation, FormSchema) | ✅ |
+| `src/lib/form-config/service.ts` | Business logic, localStorage persistence, form registry | ✅ |
+| `src/lib/form-config/hooks.tsx` | React context & hooks, registerSchema, getConfigWithSchema | ✅ |
 | `src/components/admin/FormConfigEditor.tsx` | Admin UI for form configuration | ✅ |
-| `src/components/forms/ConfiguredForm.tsx` | Dynamic form renderer | ✅ |
+| `src/components/forms/ConfiguredForm.tsx` | Dynamic form renderer, createConfiguredForm with schema | ✅ |
 
 ## Key Features
+
+### Schema-Based Forms
+Define form fields programmatically using `FormSchema`:
+
+```typescript
+const myFormSchema: FormSchema = {
+  formKey: 'my_form',
+  formName: 'My Form',
+  description: 'Description',
+  groups: [
+    { id: 'personal', name: 'personal', label: 'Personal Info' },
+  ],
+  fields: [
+    { id: 'name', name: 'name', label: 'Name', type: 'text', validation: { required: true }, groupId: 'personal' },
+  ],
+};
+
+// Create form with auto-discovery
+const MyForm = createConfiguredForm(myFormSchema);
+```
 
 ### Field Removal Toggle
 - Fields are NOT deleted when "Remove" is clicked
@@ -42,37 +62,10 @@ A dynamic form configuration system for healthcare/clinical applications with fi
 - Can enable/disable fields and groups per function
 - Metadata stored in `fieldMetadata` and `groupMetadata` arrays
 
-## Quick Start Guide
-
-### To add a new form:
-
-1. Navigate to admin panel
-2. Create new form configuration
-3. Add fields and groups
-4. Configure system activation functions if needed
-
-### To configure System Activation:
-
-1. Go to System Activations tab
-2. Add a new activation with function name (e.g., "insurance_enabled")
-3. Add fields this function should control
-4. Set fields as enabled or disabled by default
-
-## Available Recipes
-
-| Recipe | File | Use Case |
-|--------|------|----------|
-| Add Database | `.kilocode/recipes/add-database.md` | Data persistence with Drizzle + SQLite |
-
-## Pending Improvements
-
-- [ ] Add conditions/effects editor for system activations
-- [ ] Add backend integration for form configs
-- [ ] Add import/export functionality
-
 ## Session History
 
 | Date | Changes |
 |------|---------|
 | Initial | Template created with base setup |
 | 2026-03-13 | Added field removal toggle and System Activation Functions with field metadata |
+| 2026-03-13 | Added schema-based auto-discovery for dynamic form configuration |

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, ReactNode } from 'react';
-import { FormFieldConfig, FieldGroupConfig, FieldVisibility } from '@/lib/form-config/types';
+import { FormFieldConfig, FieldGroupConfig, FieldVisibility, FormSchema } from '@/lib/form-config/types';
 import { useFormConfig } from '@/lib/form-config/hooks';
 
 interface ConfiguredFormProps {
@@ -9,6 +9,7 @@ interface ConfiguredFormProps {
   backendRequired?: string[];
   onSubmit?: (data: Record<string, unknown>) => void;
   children?: ReactNode;
+  schema?: FormSchema;
 }
 
 interface FormState {
@@ -21,12 +22,18 @@ const visibilityLabels: Record<FieldVisibility, string> = {
   disabled: 'Disabled',
 };
 
-export function ConfiguredForm({ formKey, backendRequired = [], onSubmit, children }: ConfiguredFormProps) {
-  const { applyConfig, loading, error } = useFormConfig();
+export function ConfiguredForm({ formKey, backendRequired = [], onSubmit, children, schema }: ConfiguredFormProps) {
+  const { applyConfig, loading, error, registerSchema } = useFormConfig();
   const [fields, setFields] = useState<FormFieldConfig[]>([]);
   const [groups, setGroups] = useState<FieldGroupConfig[]>([]);
   const [formData, setFormData] = useState<FormState>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (schema) {
+      registerSchema(schema);
+    }
+  }, [schema, registerSchema]);
 
   useEffect(() => {
     let mounted = true;
@@ -332,8 +339,13 @@ export function ConfiguredForm({ formKey, backendRequired = [], onSubmit, childr
   );
 }
 
-export function createConfiguredForm(formKey: string, backendRequired?: string[]) {
+export function createConfiguredForm(formKey: string, backendRequired?: string[]): React.FC<{ onSubmit?: (data: Record<string, unknown>) => void }>;
+export function createConfiguredForm(schema: FormSchema, backendRequired?: string[]): React.FC<{ onSubmit?: (data: Record<string, unknown>) => void }>;
+export function createConfiguredForm(formKeyOrSchema: string | FormSchema, backendRequired?: string[]) {
+  const formKey = typeof formKeyOrSchema === 'string' ? formKeyOrSchema : formKeyOrSchema.formKey;
+  const schema = typeof formKeyOrSchema === 'object' ? formKeyOrSchema : undefined;
+  
   return function FormWrapper({ onSubmit }: { onSubmit?: (data: Record<string, unknown>) => void }) {
-    return <ConfiguredForm formKey={formKey} backendRequired={backendRequired} onSubmit={onSubmit} />;
+    return <ConfiguredForm formKey={formKey} backendRequired={backendRequired} onSubmit={onSubmit} schema={schema} />;
   };
 }
