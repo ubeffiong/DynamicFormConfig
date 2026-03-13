@@ -112,6 +112,29 @@ export interface BackendFormConfig {
   activeFormKeys: string[];
 }
 
+export type FacilityType = 
+  | 'PHC' 
+  | 'General Hospital' 
+  | 'FMC' 
+  | 'FTH' 
+  | 'Private Clinic' 
+  | 'Default';
+
+export interface CustomConfigMetadata {
+  id: string;
+  name: string;
+  description?: string;
+  facilityType: FacilityType;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomConfig {
+  metadata: CustomConfigMetadata;
+  formConfigs: FormConfig[];
+}
+
 export interface FormFieldSchema {
   id: string;
   name: string;

@@ -1,7 +1,9 @@
-import { FormConfig, FormConfigSummary, BackendFormConfig, FormFieldConfig, FieldGroupConfig, SystemFunctionActivation, FormSchema } from './types';
+import { FormConfig, FormConfigSummary, BackendFormConfig, FormFieldConfig, FieldGroupConfig, SystemFunctionActivation, FormSchema, CustomConfig, CustomConfigMetadata, FacilityType } from './types';
 
 const STORAGE_KEY = 'form_configs';
 const ACTIVE_FUNCTIONS_KEY = 'active_system_functions';
+const CUSTOM_CONFIGS_KEY = 'custom_configs';
+const ACTIVE_CUSTOM_CONFIG_KEY = 'active_custom_config';
 
 const defaultConfigs: BackendFormConfig = {
   formConfigs: [],
@@ -121,6 +123,137 @@ export async function getOrCreateConfigFromSchema(formKey: string): Promise<Form
   }
   
   return config;
+}
+
+function getStoredCustomConfigs(): CustomConfig[] {
+  if (typeof window === 'undefined') return [];
+  const stored = localStorage.getItem(CUSTOM_CONFIGS_KEY);
+  return stored ? JSON.parse(stored) : [];
+}
+
+function saveStoredCustomConfigs(configs: CustomConfig[]): void {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(CUSTOM_CONFIGS_KEY, JSON.stringify(configs));
+  }
+}
+
+export function getActiveCustomConfigId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(ACTIVE_CUSTOM_CONFIG_KEY);
+}
+
+export function setActiveCustomConfigId(configId: string | null): void {
+  if (typeof window !== 'undefined') {
+    if (configId) {
+      localStorage.setItem(ACTIVE_CUSTOM_CONFIG_KEY, configId);
+    } else {
+      localStorage.removeItem(ACTIVE_CUSTOM_CONFIG_KEY);
+    }
+  }
+}
+
+export async function fetchCustomConfigs(): Promise<CustomConfig[]> {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  return getStoredCustomConfigs();
+}
+
+export async function fetchCustomConfigById(configId: string): Promise<CustomConfig | null> {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const configs = getStoredCustomConfigs();
+  return configs.find(c => c.metadata.id === configId) || null;
+}
+
+export async function fetchCustomConfigByFacilityType(facilityType: FacilityType): Promise<CustomConfig | null> {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const configs = getStoredCustomConfigs();
+  return configs.find(c => c.metadata.facilityType === facilityType) || null;
+}
+
+export async function saveCustomConfig(
+  name: string,
+  description: string | undefined,
+  facilityType: FacilityType,
+  formConfigs: FormConfig[],
+  isDefault: boolean = false
+): Promise<CustomConfig> {
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const configs = getStoredCustomConfigs();
+  const now = new Date().toISOString();
+  
+  const existingIndex = configs.findIndex(c => c.metadata.name === name);
+  
+  const metadata: CustomConfigMetadata = {
+    id: existingIndex >= 0 ? configs[existingIndex].metadata.id : `custom-${Date.now()}`,
+    name,
+    description,
+    facilityType,
+    isDefault,
+    createdAt: existingIndex >= 0 ? configs[existingIndex].metadata.createdAt : now,
+    updatedAt: now,
+  };
+  
+  const customConfig: CustomConfig = {
+    metadata,
+    formConfigs,
+  };
+  
+  if (existingIndex >= 0) {
+    configs[existingIndex] = customConfig;
+  } else {
+    configs.push(customConfig);
+  }
+  
+  if (isDefault) {
+    for (let i = 0; i < configs.length; i++) {
+      if (configs[i].metadata.id !== metadata.id) {
+        configs[i] = {
+          ...configs[i],
+          metadata: { ...configs[i].metadata, isDefault: false },
+        };
+      }
+    }
+  }
+  
+  saveStoredCustomConfigs(configs);
+  return customConfig;
+}
+
+export async function deleteCustomConfig(configId: string): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, 50));
+  const configs = getStoredCustomConfigs();
+  const filtered = configs.filter(c => c.metadata.id !== configId);
+  saveStoredCustomConfigs(filtered);
+  
+  const activeId = getActiveCustomConfigId();
+  if (activeId === configId) {
+    setActiveCustomConfigId(null);
+  }
+}
+
+export async function loadCustomConfigToFormConfigs(configId: string): Promise<BackendFormConfig | null> {
+  await new Promise(resolve => setTimeout(resolve, 100));
+  const customConfig = await fetchCustomConfigById(configId);
+  
+  if (!customConfig) return null;
+  
+  const backendConfig: BackendFormConfig = {
+    formConfigs: customConfig.formConfigs,
+    summaries: customConfig.formConfigs.map(c => ({
+      id: c.id,
+      formKey: c.formKey,
+      formName: c.formName,
+      description: c.description,
+      isActive: c.isActive,
+      fieldCount: c.fields.filter(f => !f.isRemoved).length,
+      groupCount: c.groups.filter(g => !g.isRemoved).length,
+    })),
+    activeFormKeys: customConfig.formConfigs.filter(c => c.isActive).map(c => c.formKey),
+  };
+  
+  saveStoredConfigs(backendConfig);
+  setActiveCustomConfigId(configId);
+  
+  return backendConfig;
 }
 
 export async function fetchFormConfigs(): Promise<BackendFormConfig> {
@@ -471,4 +604,293 @@ export function initializeSampleConfigs(): void {
   configs.activeFormKeys = configs.formConfigs.filter(c => c.isActive).map(c => c.formKey);
   
   saveStoredConfigs(configs);
+}
+
+function getDefaultCustomConfigs(): CustomConfig[] {
+  const now = new Date().toISOString();
+  
+  const createFullMetadata = (name: string, facilityType: FacilityType, description: string, isDefault: boolean): CustomConfigMetadata => ({
+    id: `${facilityType.toLowerCase().replace(/\s+/g, '-')}-config`,
+    name,
+    description,
+    facilityType,
+    isDefault,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const patientFields = [
+    { id: 'firstName', name: 'firstName', label: 'First Name', type: 'text' as const, visibility: 'visible' as const, order: 1, groupId: 'personal', validation: { required: true } },
+    { id: 'lastName', name: 'lastName', label: 'Last Name', type: 'text' as const, visibility: 'visible' as const, order: 2, groupId: 'personal', validation: { required: true } },
+    { id: 'dateOfBirth', name: 'dateOfBirth', label: 'Date of Birth', type: 'date' as const, visibility: 'visible' as const, order: 3, groupId: 'personal', validation: { required: true } },
+    { id: 'gender', name: 'gender', label: 'Gender', type: 'select' as const, visibility: 'visible' as const, order: 4, groupId: 'personal', options: [
+      { label: 'Male', value: 'male' },
+      { label: 'Female', value: 'female' },
+      { label: 'Other', value: 'other' },
+    ]},
+    { id: 'phone', name: 'phone', label: 'Phone Number', type: 'tel' as const, visibility: 'visible' as const, order: 5, groupId: 'contact', validation: { required: true } },
+    { id: 'address', name: 'address', label: 'Address', type: 'textarea' as const, visibility: 'visible' as const, order: 6, groupId: 'contact' },
+  ];
+
+  const consultationFields = [
+    { id: 'consultationDate', name: 'consultationDate', label: 'Consultation Date', type: 'datetime' as const, visibility: 'visible' as const, order: 1, groupId: 'visit', validation: { required: true } },
+    { id: 'chiefComplaint', name: 'chiefComplaint', label: 'Chief Complaint', type: 'textarea' as const, visibility: 'visible' as const, order: 2, groupId: 'symptoms', validation: { required: true } },
+    { id: 'diagnosis', name: 'diagnosis', label: 'Diagnosis', type: 'textarea' as const, visibility: 'visible' as const, order: 3, groupId: 'assessment', validation: { required: true } },
+    { id: 'treatmentPlan', name: 'treatmentPlan', label: 'Treatment Plan', type: 'textarea' as const, visibility: 'visible' as const, order: 4, groupId: 'assessment' },
+  ];
+
+  const vitalsFields = [
+    { id: 'temperature', name: 'temperature', label: 'Temperature (°F)', type: 'number' as const, visibility: 'visible' as const, order: 1, groupId: 'vitals', validation: { required: true } },
+    { id: 'bloodPressure', name: 'bloodPressure', label: 'Blood Pressure', type: 'text' as const, visibility: 'visible' as const, order: 2, groupId: 'vitals' },
+    { id: 'heartRate', name: 'heartRate', label: 'Heart Rate', type: 'number' as const, visibility: 'visible' as const, order: 3, groupId: 'vitals' },
+  ];
+
+  const createFormConfig = (formKey: string, formName: string, fields: FormFieldConfig[], groups: FieldGroupConfig[]): FormConfig => ({
+    id: formKey,
+    formKey,
+    formName,
+    version: 1,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+    fields,
+    groups,
+    systemActivations: [],
+  });
+
+  const defaultConfig: CustomConfig = {
+    metadata: createDefaultMetadata('Default (Full)', 'Default', 'Full metadata with all fields enabled for comprehensive healthcare', true),
+    formConfigs: [
+      createFormConfig('patient_registration', 'Patient Registration', [
+        ...patientFields,
+        { id: 'email', name: 'email', label: 'Email', type: 'email' as const, visibility: 'visible' as const, order: 7, groupId: 'contact' },
+        { id: 'emergencyContact', name: 'emergencyContact', label: 'Emergency Contact', type: 'text' as const, visibility: 'visible' as const, order: 8, groupId: 'contact' },
+        { id: 'bloodType', name: 'bloodType', label: 'Blood Type', type: 'select' as const, visibility: 'visible' as const, order: 9, groupId: 'medical', options: [
+          { label: 'A+', value: 'A+' }, { label: 'A-', value: 'A-' }, { label: 'B+', value: 'B+' }, { label: 'B-', value: 'B-' },
+          { label: 'O+', value: 'O+' }, { label: 'O-', value: 'O-' }, { label: 'AB+', value: 'AB+' }, { label: 'AB-', value: 'AB-' },
+        ]},
+        { id: 'allergies', name: 'allergies', label: 'Allergies', type: 'textarea' as const, visibility: 'visible' as const, order: 10, groupId: 'medical' },
+        { id: 'medications', name: 'medications', label: 'Current Medications', type: 'textarea' as const, visibility: 'visible' as const, order: 11, groupId: 'medical' },
+      ], [
+        { id: 'personal', name: 'personal', label: 'Personal Information', visibility: 'visible' as const, order: 1 },
+        { id: 'contact', name: 'contact', label: 'Contact Details', visibility: 'visible' as const, order: 2 },
+        { id: 'medical', name: 'medical', label: 'Medical History', visibility: 'visible' as const, order: 3 },
+      ]),
+      createFormConfig('consultation', 'General Consultation', consultationFields, [
+        { id: 'visit', name: 'visit', label: 'Visit Details', visibility: 'visible' as const, order: 1 },
+        { id: 'symptoms', name: 'symptoms', label: 'Symptoms', visibility: 'visible' as const, order: 2 },
+        { id: 'assessment', name: 'assessment', label: 'Assessment', visibility: 'visible' as const, order: 3 },
+      ]),
+      createFormConfig('vitals', 'Vital Signs', vitalsFields, [
+        { id: 'vitals', name: 'vitals', label: 'Vital Signs', visibility: 'visible' as const, order: 1 },
+      ]),
+    ],
+  };
+
+  const phcConfig: CustomConfig = {
+    metadata: createDefaultMetadata('PHC', 'PHC', 'Primary Health Centre - Basic essential fields only', false),
+    formConfigs: [
+      createFormConfig('patient_registration', 'Patient Registration', patientFields.slice(0, 4), [
+        { id: 'personal', name: 'personal', label: 'Personal Information', visibility: 'visible' as const, order: 1 },
+      ]),
+      createFormConfig('consultation', 'General Consultation', consultationFields.slice(0, 2), [
+        { id: 'visit', name: 'visit', label: 'Visit Details', visibility: 'visible' as const, order: 1 },
+        { id: 'symptoms', name: 'symptoms', label: 'Symptoms', visibility: 'visible' as const, order: 2 },
+      ]),
+      createFormConfig('vitals', 'Vital Signs', vitalsFields.slice(0, 2), [
+        { id: 'vitals', name: 'vitals', label: 'Vital Signs', visibility: 'visible' as const, order: 1 },
+      ]),
+    ],
+  };
+
+  const generalHospitalConfig: CustomConfig = {
+    metadata: createDefaultMetadata('General Hospital', 'General Hospital', 'Full hospital with all departments and comprehensive fields', false),
+    formConfigs: [
+      createFormConfig('patient_registration', 'Patient Registration', [
+        ...patientFields,
+        { id: 'email', name: 'email', label: 'Email', type: 'email' as const, visibility: 'visible' as const, order: 7, groupId: 'contact' },
+        { id: 'emergencyContact', name: 'emergencyContact', label: 'Emergency Contact', type: 'text' as const, visibility: 'visible' as const, order: 8, groupId: 'contact' },
+        { id: 'emergencyPhone', name: 'emergencyPhone', label: 'Emergency Phone', type: 'tel' as const, visibility: 'visible' as const, order: 9, groupId: 'contact' },
+        { id: 'bloodType', name: 'bloodType', label: 'Blood Type', type: 'select' as const, visibility: 'visible' as const, order: 10, groupId: 'medical', options: [
+          { label: 'A+', value: 'A+' }, { label: 'A-', value: 'A-' }, { label: 'B+', value: 'B+' }, { label: 'B-', value: 'B-' },
+          { label: 'O+', value: 'O+' }, { label: 'O-', value: 'O-' }, { label: 'AB+', value: 'AB+' }, { label: 'AB-', value: 'AB-' },
+        ]},
+        { id: 'allergies', name: 'allergies', label: 'Allergies', type: 'textarea' as const, visibility: 'visible' as const, order: 11, groupId: 'medical' },
+        { id: 'medications', name: 'medications', label: 'Current Medications', type: 'textarea' as const, visibility: 'visible' as const, order: 12, groupId: 'medical' },
+        { id: 'insuranceProvider', name: 'insuranceProvider', label: 'Insurance Provider', type: 'text' as const, visibility: 'visible' as const, order: 13, groupId: 'insurance' },
+        { id: 'policyNumber', name: 'policyNumber', label: 'Policy Number', type: 'text' as const, visibility: 'visible' as const, order: 14, groupId: 'insurance' },
+      ], [
+        { id: 'personal', name: 'personal', label: 'Personal Information', visibility: 'visible' as const, order: 1 },
+        { id: 'contact', name: 'contact', label: 'Contact Details', visibility: 'visible' as const, order: 2 },
+        { id: 'medical', name: 'medical', label: 'Medical History', visibility: 'visible' as const, order: 3 },
+        { id: 'insurance', name: 'insurance', label: 'Insurance Information', visibility: 'visible' as const, order: 4 },
+      ]),
+      createFormConfig('consultation', 'General Consultation', [
+        ...consultationFields,
+        { id: 'labTests', name: 'labTests', label: 'Lab Tests Ordered', type: 'textarea' as const, visibility: 'visible' as const, order: 5, groupId: 'tests' },
+        { id: 'referrals', name: 'referrals', label: 'Referrals', type: 'textarea' as const, visibility: 'visible' as const, order: 6, groupId: 'referrals' },
+      ], [
+        { id: 'visit', name: 'visit', label: 'Visit Details', visibility: 'visible' as const, order: 1 },
+        { id: 'symptoms', name: 'symptoms', label: 'Symptoms', visibility: 'visible' as const, order: 2 },
+        { id: 'assessment', name: 'assessment', label: 'Assessment', visibility: 'visible' as const, order: 3 },
+        { id: 'tests', name: 'tests', label: 'Lab Tests', visibility: 'visible' as const, order: 4 },
+        { id: 'referrals', name: 'referrals', label: 'Referrals', visibility: 'visible' as const, order: 5 },
+      ]),
+      createFormConfig('vitals', 'Vital Signs', [
+        ...vitalsFields,
+        { id: 'oxygenSaturation', name: 'oxygenSaturation', label: 'Oxygen Saturation', type: 'number' as const, visibility: 'visible' as const, order: 4, groupId: 'vitals' },
+        { id: 'respiratoryRate', name: 'respiratoryRate', label: 'Respiratory Rate', type: 'number' as const, visibility: 'visible' as const, order: 5, groupId: 'vitals' },
+        { id: 'weight', name: 'weight', label: 'Weight (kg)', type: 'number' as const, visibility: 'visible' as const, order: 6, groupId: 'anthropometric' },
+        { id: 'height', name: 'height', label: 'Height (cm)', type: 'number' as const, visibility: 'visible' as const, order: 7, groupId: 'anthropometric' },
+      ], [
+        { id: 'vitals', name: 'vitals', label: 'Vital Signs', visibility: 'visible' as const, order: 1 },
+        { id: 'anthropometric', name: 'anthropometric', label: 'Anthropometric', visibility: 'visible' as const, order: 2 },
+      ]),
+    ],
+  };
+
+  const fmcConfig: CustomConfig = {
+    metadata: createDefaultMetadata('FMC', 'FMC', 'Federal Medical Centre - Comprehensive fields with specialist support', false),
+    formConfigs: [
+      createFormConfig('patient_registration', 'Patient Registration', [
+        ...patientFields,
+        { id: 'email', name: 'email', label: 'Email', type: 'email' as const, visibility: 'visible' as const, order: 7, groupId: 'contact' },
+        { id: 'emergencyContact', name: 'emergencyContact', label: 'Emergency Contact', type: 'text' as const, visibility: 'visible' as const, order: 8, groupId: 'contact' },
+        { id: 'nationalId', name: 'nationalId', label: 'National ID', type: 'text' as const, visibility: 'visible' as const, order: 9, groupId: 'identification' },
+        { id: 'bloodType', name: 'bloodType', label: 'Blood Type', type: 'select' as const, visibility: 'visible' as const, order: 10, groupId: 'medical', options: [
+          { label: 'A+', value: 'A+' }, { label: 'A-', value: 'A-' }, { label: 'B+', value: 'B+' }, { label: 'B-', value: 'B-' },
+          { label: 'O+', value: 'O+' }, { label: 'O-', value: 'O-' }, { label: 'AB+', value: 'AB+' }, { label: 'AB-', value: 'AB-' },
+        ]},
+        { id: 'genotype', name: 'genotype', label: 'Genotype', type: 'select' as const, visibility: 'visible' as const, order: 11, groupId: 'medical', options: [
+          { label: 'AA', value: 'AA' }, { label: 'AS', value: 'AS' }, { label: 'SS', value: 'SS' }, { label: 'AC', value: 'AC' },
+        ]},
+        { id: 'allergies', name: 'allergies', label: 'Allergies', type: 'textarea' as const, visibility: 'visible' as const, order: 12, groupId: 'medical' },
+        { id: 'medications', name: 'medications', label: 'Current Medications', type: 'textarea' as const, visibility: 'visible' as const, order: 13, groupId: 'medical' },
+        { id: 'insuranceProvider', name: 'insuranceProvider', label: 'Insurance Provider', type: 'text' as const, visibility: 'visible' as const, order: 14, groupId: 'insurance' },
+        { id: 'policyNumber', name: 'policyNumber', label: 'Policy Number', type: 'text' as const, visibility: 'visible' as const, order: 15, groupId: 'insurance' },
+      ], [
+        { id: 'personal', name: 'personal', label: 'Personal Information', visibility: 'visible' as const, order: 1 },
+        { id: 'contact', name: 'contact', label: 'Contact Details', visibility: 'visible' as const, order: 2 },
+        { id: 'identification', name: 'identification', label: 'Identification', visibility: 'visible' as const, order: 3 },
+        { id: 'medical', name: 'medical', label: 'Medical History', visibility: 'visible' as const, order: 4 },
+        { id: 'insurance', name: 'insurance', label: 'Insurance Information', visibility: 'visible' as const, order: 5 },
+      ]),
+      createFormConfig('consultation', 'General Consultation', consultationFields, [
+        { id: 'visit', name: 'visit', label: 'Visit Details', visibility: 'visible' as const, order: 1 },
+        { id: 'symptoms', name: 'symptoms', label: 'Symptoms', visibility: 'visible' as const, order: 2 },
+        { id: 'assessment', name: 'assessment', label: 'Assessment', visibility: 'visible' as const, order: 3 },
+      ]),
+      createFormConfig('vitals', 'Vital Signs', vitalsFields, [
+        { id: 'vitals', name: 'vitals', label: 'Vital Signs', visibility: 'visible' as const, order: 1 },
+      ]),
+    ],
+  };
+
+  const fthConfig: CustomConfig = {
+    metadata: createDefaultMetadata('FTH', 'FTH', 'Federal Teaching Hospital - Full academic hospital setup', false),
+    formConfigs: [
+      createFormConfig('patient_registration', 'Patient Registration', [
+        ...patientFields,
+        { id: 'email', name: 'email', label: 'Email', type: 'email' as const, visibility: 'visible' as const, order: 7, groupId: 'contact' },
+        { id: 'emergencyContact', name: 'emergencyContact', label: 'Emergency Contact', type: 'text' as const, visibility: 'visible' as const, order: 8, groupId: 'contact' },
+        { id: 'emergencyPhone', name: 'emergencyPhone', label: 'Emergency Phone', type: 'tel' as const, visibility: 'visible' as const, order: 9, groupId: 'contact' },
+        { id: 'nationalId', name: 'nationalId', label: 'National ID', type: 'text' as const, visibility: 'visible' as const, order: 10, groupId: 'identification' },
+        { id: 'bloodType', name: 'bloodType', label: 'Blood Type', type: 'select' as const, visibility: 'visible' as const, order: 11, groupId: 'medical', options: [
+          { label: 'A+', value: 'A+' }, { label: 'A-', value: 'A-' }, { label: 'B+', value: 'B+' }, { label: 'B-', value: 'B-' },
+          { label: 'O+', value: 'O+' }, { label: 'O-', value: 'O-' }, { label: 'AB+', value: 'AB+' }, { label: 'AB-', value: 'AB-' },
+        ]},
+        { id: 'genotype', name: 'genotype', label: 'Genotype', type: 'select' as const, visibility: 'visible' as const, order: 12, groupId: 'medical', options: [
+          { label: 'AA', value: 'AA' }, { label: 'AS', value: 'AS' }, { label: 'SS', value: 'SS' }, { label: 'AC', value: 'AC' },
+        ]},
+        { id: 'allergies', name: 'allergies', label: 'Allergies', type: 'textarea' as const, visibility: 'visible' as const, order: 13, groupId: 'medical' },
+        { id: 'medications', name: 'medications', label: 'Current Medications', type: 'textarea' as const, visibility: 'visible' as const, order: 14, groupId: 'medical' },
+        { id: 'pastMedicalHistory', name: 'pastMedicalHistory', label: 'Past Medical History', type: 'textarea' as const, visibility: 'visible' as const, order: 15, groupId: 'medical' },
+        { id: 'surgicalHistory', name: 'surgicalHistory', label: 'Surgical History', type: 'textarea' as const, visibility: 'visible' as const, order: 16, groupId: 'medical' },
+        { id: 'familyHistory', name: 'familyHistory', label: 'Family History', type: 'textarea' as const, visibility: 'visible' as const, order: 17, groupId: 'medical' },
+        { id: 'insuranceProvider', name: 'insuranceProvider', label: 'Insurance Provider', type: 'text' as const, visibility: 'visible' as const, order: 18, groupId: 'insurance' },
+        { id: 'policyNumber', name: 'policyNumber', label: 'Policy Number', type: 'text' as const, visibility: 'visible' as const, order: 19, groupId: 'insurance' },
+      ], [
+        { id: 'personal', name: 'personal', label: 'Personal Information', visibility: 'visible' as const, order: 1 },
+        { id: 'contact', name: 'contact', label: 'Contact Details', visibility: 'visible' as const, order: 2 },
+        { id: 'identification', name: 'identification', label: 'Identification', visibility: 'visible' as const, order: 3 },
+        { id: 'medical', name: 'medical', label: 'Medical History', visibility: 'visible' as const, order: 4 },
+        { id: 'insurance', name: 'insurance', label: 'Insurance Information', visibility: 'visible' as const, order: 5 },
+      ]),
+      createFormConfig('consultation', 'General Consultation', [
+        ...consultationFields,
+        { id: 'labTests', name: 'labTests', label: 'Lab Tests', type: 'textarea' as const, visibility: 'visible' as const, order: 5, groupId: 'investigations' },
+        { id: 'imaging', name: 'imaging', label: 'Imaging Studies', type: 'textarea' as const, visibility: 'visible' as const, order: 6, groupId: 'investigations' },
+        { id: 'referrals', name: 'referrals', label: 'Referrals', type: 'textarea' as const, visibility: 'visible' as const, order: 7, groupId: 'referrals' },
+        { id: 'followUp', name: 'followUp', label: 'Follow-up Plan', type: 'textarea' as const, visibility: 'visible' as const, order: 8, groupId: 'plan' },
+      ], [
+        { id: 'visit', name: 'visit', label: 'Visit Details', visibility: 'visible' as const, order: 1 },
+        { id: 'symptoms', name: 'symptoms', label: 'Symptoms', visibility: 'visible' as const, order: 2 },
+        { id: 'assessment', name: 'assessment', label: 'Assessment', visibility: 'visible' as const, order: 3 },
+        { id: 'investigations', name: 'investigations', label: 'Investigations', visibility: 'visible' as const, order: 4 },
+        { id: 'referrals', name: 'referrals', label: 'Referrals', visibility: 'visible' as const, order: 5 },
+        { id: 'plan', name: 'plan', label: 'Plan', visibility: 'visible' as const, order: 6 },
+      ]),
+      createFormConfig('vitals', 'Vital Signs', [
+        ...vitalsFields,
+        { id: 'oxygenSaturation', name: 'oxygenSaturation', label: 'Oxygen Saturation', type: 'number' as const, visibility: 'visible' as const, order: 4, groupId: 'vitals' },
+        { id: 'respiratoryRate', name: 'respiratoryRate', label: 'Respiratory Rate', type: 'number' as const, visibility: 'visible' as const, order: 5, groupId: 'vitals' },
+        { id: 'weight', name: 'weight', label: 'Weight (kg)', type: 'number' as const, visibility: 'visible' as const, order: 6, groupId: 'anthropometric' },
+        { id: 'height', name: 'height', label: 'Height (cm)', type: 'number' as const, visibility: 'visible' as const, order: 7, groupId: 'anthropometric' },
+        { id: 'bmi', name: 'bmi', label: 'BMI', type: 'number' as const, visibility: 'visible' as const, order: 8, groupId: 'anthropometric' },
+      ], [
+        { id: 'vitals', name: 'vitals', label: 'Vital Signs', visibility: 'visible' as const, order: 1 },
+        { id: 'anthropometric', name: 'anthropometric', label: 'Anthropometric', visibility: 'visible' as const, order: 2 },
+      ]),
+    ],
+  };
+
+  const privateClinicConfig: CustomConfig = {
+    metadata: createDefaultMetadata('Private Clinic', 'Private Clinic', 'Private clinic - personalized care with essential fields', false),
+    formConfigs: [
+      createFormConfig('patient_registration', 'Patient Registration', patientFields.slice(0, 6), [
+        { id: 'personal', name: 'personal', label: 'Personal Information', visibility: 'visible' as const, order: 1 },
+        { id: 'contact', name: 'contact', label: 'Contact Details', visibility: 'visible' as const, order: 2 },
+      ]),
+      createFormConfig('consultation', 'Consultation', [
+        { id: 'consultationDate', name: 'consultationDate', label: 'Consultation Date', type: 'datetime' as const, visibility: 'visible' as const, order: 1, groupId: 'visit', validation: { required: true } },
+        { id: 'chiefComplaint', name: 'chiefComplaint', label: 'Chief Complaint', type: 'textarea' as const, visibility: 'visible' as const, order: 2, groupId: 'symptoms', validation: { required: true } },
+        { id: 'symptomDuration', name: 'symptomDuration', label: 'Duration', type: 'text' as const, visibility: 'visible' as const, order: 3, groupId: 'symptoms' },
+        { id: 'notes', name: 'notes', label: 'Clinical Notes', type: 'textarea' as const, visibility: 'visible' as const, order: 4, groupId: 'assessment' },
+        { id: 'diagnosis', name: 'diagnosis', label: 'Diagnosis', type: 'textarea' as const, visibility: 'visible' as const, order: 5, groupId: 'assessment', validation: { required: true } },
+        { id: 'prescription', name: 'prescription', label: 'Prescription', type: 'textarea' as const, visibility: 'visible' as const, order: 6, groupId: 'treatment' },
+        { id: 'followUpDate', name: 'followUpDate', label: 'Follow-up Date', type: 'date' as const, visibility: 'visible' as const, order: 7, groupId: 'treatment' },
+      ], [
+        { id: 'visit', name: 'visit', label: 'Visit Details', visibility: 'visible' as const, order: 1 },
+        { id: 'symptoms', name: 'symptoms', label: 'Symptoms', visibility: 'visible' as const, order: 2 },
+        { id: 'assessment', name: 'assessment', label: 'Assessment', visibility: 'visible' as const, order: 3 },
+        { id: 'treatment', name: 'treatment', label: 'Treatment Plan', visibility: 'visible' as const, order: 4 },
+      ]),
+      createFormConfig('vitals', 'Vital Signs', vitalsFields.slice(0, 3), [
+        { id: 'vitals', name: 'vitals', label: 'Vital Signs', visibility: 'visible' as const, order: 1 },
+      ]),
+    ],
+  };
+
+  return [defaultConfig, phcConfig, generalHospitalConfig, fmcConfig, fthConfig, privateClinicConfig];
+}
+
+function createDefaultMetadata(name: string, facilityType: FacilityType, description: string, isDefault: boolean): CustomConfigMetadata {
+  const now = new Date().toISOString();
+  return {
+    id: `${facilityType.toLowerCase().replace(/\s+/g, '-')}-config`,
+    name,
+    description,
+    facilityType,
+    isDefault,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export function initializeDefaultCustomConfigs(): void {
+  const existingConfigs = getStoredCustomConfigs();
+  if (existingConfigs.length > 0) return;
+  
+  const defaultConfigs = getDefaultCustomConfigs();
+  saveStoredCustomConfigs(defaultConfigs);
 }

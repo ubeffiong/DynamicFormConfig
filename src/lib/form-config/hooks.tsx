@@ -8,6 +8,8 @@ import {
   FormFieldConfig,
   FieldGroupConfig,
   FormSchema,
+  CustomConfig,
+  FacilityType,
 } from './types';
 import {
   fetchFormConfigs,
@@ -22,6 +24,12 @@ import {
   initializeSampleConfigs,
   registerFormSchema,
   getOrCreateConfigFromSchema,
+  fetchCustomConfigs,
+  saveCustomConfig as saveCustomConfigService,
+  deleteCustomConfig as deleteCustomConfigService,
+  loadCustomConfigToFormConfigs,
+  getActiveCustomConfigId,
+  initializeDefaultCustomConfigs,
 } from './service';
 
 interface FormConfigContextValue {
@@ -42,6 +50,12 @@ interface FormConfigContextValue {
     formData: Record<string, unknown>,
     backendRequired?: string[]
   ) => Promise<{ fields: FormFieldConfig[]; groups: FieldGroupConfig[] }>;
+  customConfigs: CustomConfig[];
+  activeCustomConfigId: string | null;
+  refreshCustomConfigs: () => Promise<void>;
+  saveCustomConfig: (name: string, description: string | undefined, facilityType: FacilityType, formConfigs: FormConfig[], isDefault: boolean) => Promise<CustomConfig>;
+  deleteCustomConfig: (configId: string) => Promise<void>;
+  loadCustomConfig: (configId: string) => Promise<void>;
 }
 
 const FormConfigContext = createContext<FormConfigContextValue | null>(null);
@@ -51,15 +65,19 @@ export function FormConfigProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeFunctions, setActiveFunctionsState] = useState<string[]>([]);
+  const [customConfigs, setCustomConfigs] = useState<CustomConfig[]>([]);
+  const [activeCustomConfigId, setActiveCustomConfigId] = useState<string | null>(null);
 
   const refreshConfigs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       initializeSampleConfigs();
+      initializeDefaultCustomConfigs();
       const data = await fetchFormConfigs();
       setConfigs(data);
       setActiveFunctionsState(getActiveSystemFunctions());
+      setActiveCustomConfigId(getActiveCustomConfigId());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load configurations');
     } finally {
@@ -67,9 +85,15 @@ export function FormConfigProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshCustomConfigs = useCallback(async () => {
+    const data = await fetchCustomConfigs();
+    setCustomConfigs(data);
+  }, []);
+
   useEffect(() => {
     refreshConfigs();
-  }, [refreshConfigs]);
+    refreshCustomConfigs();
+  }, [refreshConfigs, refreshCustomConfigs]);
 
   const getConfig = useCallback(async (formKey: string): Promise<FormConfig | null> => {
     return fetchFormConfigByKey(formKey);
@@ -124,6 +148,29 @@ export function FormConfigProvider({ children }: { children: ReactNode }) {
     return { fields, groups };
   }, [activeFunctions]);
 
+  const saveCustomConfigHandler = useCallback(async (
+    name: string,
+    description: string | undefined,
+    facilityType: FacilityType,
+    formConfigs: FormConfig[],
+    isDefault: boolean
+  ): Promise<CustomConfig> => {
+    const saved = await saveCustomConfigService(name, description, facilityType, formConfigs, isDefault);
+    await refreshCustomConfigs();
+    return saved;
+  }, [refreshCustomConfigs]);
+
+  const deleteCustomConfigHandler = useCallback(async (configId: string): Promise<void> => {
+    await deleteCustomConfigService(configId);
+    await refreshCustomConfigs();
+  }, [refreshCustomConfigs]);
+
+  const loadCustomConfigHandler = useCallback(async (configId: string): Promise<void> => {
+    await loadCustomConfigToFormConfigs(configId);
+    await refreshConfigs();
+    setActiveCustomConfigId(configId);
+  }, [refreshConfigs]);
+
   return (
     <FormConfigContext.Provider
       value={{
@@ -140,6 +187,12 @@ export function FormConfigProvider({ children }: { children: ReactNode }) {
         setActiveFunctions: setActiveFunctionsHandler,
         registerSchema,
         applyConfig,
+        customConfigs,
+        activeCustomConfigId,
+        refreshCustomConfigs,
+        saveCustomConfig: saveCustomConfigHandler,
+        deleteCustomConfig: deleteCustomConfigHandler,
+        loadCustomConfig: loadCustomConfigHandler,
       }}
     >
       {children}

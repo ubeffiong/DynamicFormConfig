@@ -93,14 +93,35 @@ const SettingsForm = createConfiguredForm('settings');
 const GeneralConsultationForm = createConfiguredForm(generalConsultationSchema);
 
 function AdminPanel() {
-  const { configs, activateConfig, loading } = useFormConfig();
+  const { configs, activateConfig, loading, customConfigs, activeCustomConfigId, saveCustomConfig, deleteCustomConfig, loadCustomConfig } = useFormConfig();
   const [editingForm, setEditingForm] = useState<string | null>(null);
   const [showActivationPanel, setShowActivationPanel] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const [activeFunctions, setActiveFunctions] = useState<string[]>([]);
+  const [saveName, setSaveName] = useState('');
+  const [saveDescription, setSaveDescription] = useState('');
+  const [saveFacilityType, setSaveFacilityType] = useState<string>('Default');
+  const [saveAsDefault, setSaveAsDefault] = useState(false);
 
   const handleActivate = async (formKey: string, active: boolean) => {
     await activateConfig(formKey, active);
   };
+
+  const handleSaveCustomConfig = async () => {
+    if (!saveName) return;
+    await saveCustomConfig(saveName, saveDescription || undefined, saveFacilityType as any, configs.formConfigs, saveAsDefault);
+    setShowSaveModal(false);
+    setSaveName('');
+    setSaveDescription('');
+    setSaveFacilityType('Default');
+    setSaveAsDefault(false);
+  };
+
+  const handleLoadConfig = async (configId: string) => {
+    await loadCustomConfig(configId);
+  };
+
+  const facilityTypes = ['Default', 'PHC', 'General Hospital', 'FMC', 'FTH', 'Private Clinic'];
 
   if (loading) {
     return <div className="p-4">Loading...</div>;
@@ -110,12 +131,60 @@ function AdminPanel() {
     <div className="admin-panel">
       <div className="header mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold">Form Configuration Admin</h1>
-        <button
-          onClick={() => setShowActivationPanel(!showActivationPanel)}
-          className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-        >
-          {showActivationPanel ? 'Hide' : 'Show'} System Functions
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowSaveModal(true)}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Save as Custom Config
+          </button>
+          <button
+            onClick={() => setShowActivationPanel(!showActivationPanel)}
+            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+          >
+            {showActivationPanel ? 'Hide' : 'Show'} System Functions
+          </button>
+        </div>
+      </div>
+
+      <div className="custom-configs-panel mb-6 p-4 border rounded bg-blue-50">
+        <h2 className="text-lg font-semibold mb-3">Custom Configurations</h2>
+        <p className="text-sm text-gray-600 mb-3">
+          Load a pre-configured set of forms for your facility type
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {customConfigs.map(config => (
+            <div key={config.metadata.id} className={`flex items-center gap-2 px-4 py-3 bg-white border rounded ${activeCustomConfigId === config.metadata.id ? 'border-blue-500 ring-2 ring-blue-200' : ''}`}>
+              <div className="flex-1">
+                <div className="font-medium">{config.metadata.name}</div>
+                <div className="text-xs text-gray-500">{config.metadata.facilityType} - {config.formConfigs.length} forms</div>
+                {config.metadata.isDefault && (
+                  <span className="text-xs bg-yellow-100 text-yellow-800 px-1 rounded">Default</span>
+                )}
+              </div>
+              <button
+                onClick={() => handleLoadConfig(config.metadata.id)}
+                className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+              >
+                Load
+              </button>
+              <button
+                onClick={() => deleteCustomConfig(config.metadata.id)}
+                className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+          {customConfigs.length === 0 && (
+            <p className="text-gray-500 italic">No custom configurations saved yet.</p>
+          )}
+        </div>
+        {activeCustomConfigId && (
+          <div className="mt-3 text-sm text-green-600 font-medium">
+            Currently loaded: {customConfigs.find(c => c.metadata.id === activeCustomConfigId)?.metadata.name}
+          </div>
+        )}
       </div>
 
       {showActivationPanel && (
@@ -199,6 +268,76 @@ function AdminPanel() {
               onSave={() => setEditingForm(null)}
               onCancel={() => setEditingForm(null)}
             />
+          </div>
+        </div>
+      )}
+
+      {showSaveModal && (
+        <div className="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="modal-content bg-white rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Save Custom Configuration</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Configuration Name *</label>
+                <input
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="e.g., My Hospital Config"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <textarea
+                  value={saveDescription}
+                  onChange={(e) => setSaveDescription(e.target.value)}
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Optional description"
+                  rows={2}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Facility Type</label>
+                <select
+                  value={saveFacilityType}
+                  onChange={(e) => setSaveFacilityType(e.target.value)}
+                  className="w-full border rounded px-3 py-2"
+                >
+                  {facilityTypes.map(ft => (
+                    <option key={ft} value={ft}>{ft}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={saveAsDefault}
+                    onChange={(e) => setSaveAsDefault(e.target.checked)}
+                  />
+                  <span className="text-sm">Set as default configuration</span>
+                </label>
+              </div>
+              <div className="text-sm text-gray-500">
+                This will save {configs.formConfigs.length} form configurations that can be loaded later.
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={handleSaveCustomConfig}
+                disabled={!saveName}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                Save Configuration
+              </button>
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}
