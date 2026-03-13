@@ -90,20 +90,29 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
 
   const removeField = (fieldId: string) => {
     if (!config) return;
-    setConfig({ ...config, fields: config.fields.filter(f => f.id !== fieldId) });
+    setConfig({ 
+      ...config, 
+      fields: config.fields.map(f => f.id === fieldId ? { ...f, isRemoved: !f.isRemoved } : f) 
+    });
   };
 
   const removeGroup = (groupId: string) => {
     if (!config) return;
-    setConfig({ ...config, groups: config.groups.filter(g => g.id !== groupId) });
+    setConfig({ 
+      ...config, 
+      groups: config.groups.map(g => g.id === groupId ? { ...g, isRemoved: !g.isRemoved } : g) 
+    });
   };
 
   const addActivation = () => {
     if (!config) return;
     const newActivation: SystemFunctionActivation = {
       functionName: '',
+      description: '',
       conditions: [],
       effects: [],
+      fieldMetadata: [],
+      groupMetadata: [],
     };
     setConfig({ ...config, systemActivations: [...config.systemActivations, newActivation] });
   };
@@ -166,13 +175,13 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
           className={`px-4 py-2 ${activeTab === 'fields' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
           onClick={() => setActiveTab('fields')}
         >
-          Fields ({config.fields.length})
+          Fields ({config.fields.filter(f => !f.isRemoved).length}/{config.fields.length})
         </button>
         <button
           className={`px-4 py-2 ${activeTab === 'groups' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
           onClick={() => setActiveTab('groups')}
         >
-          Groups ({config.groups.length})
+          Groups ({config.groups.filter(g => !g.isRemoved).length}/{config.groups.length})
         </button>
         <button
           className={`px-4 py-2 ${activeTab === 'activations' ? 'border-b-2 border-blue-500 font-medium' : ''}`}
@@ -189,7 +198,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
           </button>
           <div className="space-y-3">
             {config.fields.map((field) => (
-              <div key={field.id} className="field-card p-3 border rounded bg-white">
+              <div key={field.id} className={`field-card p-3 border rounded bg-white ${field.isRemoved ? 'opacity-60 bg-red-50 border-red-200' : ''}`}>
                 <div className="grid grid-cols-4 gap-3">
                   <div>
                     <label className="block text-xs font-medium">Name</label>
@@ -198,6 +207,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={field.name}
                       onChange={(e) => updateField(field.id, { name: e.target.value })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={field.isRemoved}
                     />
                   </div>
                   <div>
@@ -207,6 +217,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={field.label}
                       onChange={(e) => updateField(field.id, { label: e.target.value })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={field.isRemoved}
                     />
                   </div>
                   <div>
@@ -215,6 +226,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={field.type}
                       onChange={(e) => updateField(field.id, { type: e.target.value as FormFieldConfig['type'] })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={field.isRemoved}
                     >
                       <option value="text">Text</option>
                       <option value="number">Number</option>
@@ -233,6 +245,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={field.visibility}
                       onChange={(e) => updateField(field.id, { visibility: e.target.value as FieldVisibility })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={field.isRemoved}
                     >
                       <option value="visible">Visible</option>
                       <option value="hidden">Hidden</option>
@@ -247,6 +260,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={field.groupId || ''}
                       onChange={(e) => updateField(field.id, { groupId: e.target.value || undefined })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={field.isRemoved}
                     >
                       <option value="">No Group</option>
                       {config.groups.map(g => (
@@ -261,6 +275,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={field.order}
                       onChange={(e) => updateField(field.id, { order: parseInt(e.target.value) || 0 })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={field.isRemoved}
                     />
                   </div>
                   <div>
@@ -272,17 +287,32 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                         validation: { ...field.validation, required: e.target.checked }
                       })}
                       className="mt-1"
+                      disabled={field.isRemoved}
                     />
                   </div>
                   <div className="flex items-end">
-                    <button
-                      onClick={() => removeField(field.id)}
-                      className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
-                    >
-                      Remove
-                    </button>
+                    {field.isRemoved ? (
+                      <button
+                        onClick={() => removeField(field.id)}
+                        className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                      >
+                        Restore
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => removeField(field.id)}
+                        className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                 </div>
+                {field.isRemoved && (
+                  <div className="mt-2 text-xs text-red-600 font-medium">
+                    This field has been removed and will not appear in the form. Click Restore to add it back.
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -296,7 +326,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
           </button>
           <div className="space-y-3">
             {config.groups.map((group) => (
-              <div key={group.id} className="group-card p-3 border rounded bg-white">
+              <div key={group.id} className={`group-card p-3 border rounded bg-white ${group.isRemoved ? 'opacity-60 bg-red-50 border-red-200' : ''}`}>
                 <div className="grid grid-cols-4 gap-3">
                   <div>
                     <label className="block text-xs font-medium">Name</label>
@@ -305,6 +335,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={group.name}
                       onChange={(e) => updateGroup(group.id, { name: e.target.value })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={group.isRemoved}
                     />
                   </div>
                   <div>
@@ -314,6 +345,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={group.label}
                       onChange={(e) => updateGroup(group.id, { label: e.target.value })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={group.isRemoved}
                     />
                   </div>
                   <div>
@@ -322,6 +354,7 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={group.visibility}
                       onChange={(e) => updateGroup(group.id, { visibility: e.target.value as FieldVisibility })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={group.isRemoved}
                     >
                       <option value="visible">Visible</option>
                       <option value="hidden">Hidden</option>
@@ -334,17 +367,32 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
                       value={group.order}
                       onChange={(e) => updateGroup(group.id, { order: parseInt(e.target.value) || 0 })}
                       className="w-full border rounded px-2 py-1 text-sm"
+                      disabled={group.isRemoved}
                     />
                   </div>
                 </div>
                 <div className="mt-2 flex justify-end">
-                  <button
-                    onClick={() => removeGroup(group.id)}
-                    className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
-                  >
-                    Remove
-                  </button>
+                  {group.isRemoved ? (
+                    <button
+                      onClick={() => removeGroup(group.id)}
+                      className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600"
+                    >
+                      Restore
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => removeGroup(group.id)}
+                      className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
+                {group.isRemoved && (
+                  <div className="mt-2 text-xs text-red-600 font-medium">
+                    This group has been removed and will not appear in the form. Click Restore to add it back.
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -359,16 +407,179 @@ export function FormConfigEditor({ formKey, onSave, onCancel }: FormConfigEditor
           <div className="space-y-4">
             {config.systemActivations.map((activation, index) => (
               <div key={index} className="activation-card p-3 border rounded bg-white">
-                <div className="mb-3">
-                  <label className="block text-sm font-medium">Function Name</label>
-                  <input
-                    type="text"
-                    value={activation.functionName}
-                    onChange={(e) => updateActivation(index, { functionName: e.target.value })}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="e.g., insurance_enabled"
-                  />
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-sm font-medium">Function Name</label>
+                    <input
+                      type="text"
+                      value={activation.functionName}
+                      onChange={(e) => updateActivation(index, { functionName: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                      placeholder="e.g., insurance_enabled"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium">Description</label>
+                    <input
+                      type="text"
+                      value={activation.description || ''}
+                      onChange={(e) => updateActivation(index, { description: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                      placeholder="e.g., Controls insurance-related fields"
+                    />
+                  </div>
                 </div>
+
+                <div className="mb-4 p-3 bg-gray-50 rounded">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium">Controlled Fields</label>
+                    <button
+                      onClick={() => {
+                        const availableFields = config.fields
+                          .filter(f => !activation.fieldMetadata?.some(m => m.fieldId === f.id))
+                          .map(f => ({ fieldId: f.id, isEnabled: true }));
+                        updateActivation(index, { 
+                          fieldMetadata: [...(activation.fieldMetadata || []), ...availableFields] 
+                        });
+                      }}
+                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      Add All Fields
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-600 mb-2">
+                    Manage which fields this function can enable/disable when activated
+                  </div>
+                  <div className="space-y-2">
+                    {activation.fieldMetadata?.map((meta, metaIndex) => {
+                      const field = config.fields.find(f => f.id === meta.fieldId);
+                      return field ? (
+                        <div key={meta.fieldId} className="flex items-center gap-2 bg-white p-2 rounded border">
+                          <span className="text-sm flex-1">{field.label} ({field.name})</span>
+                          <select
+                            value={meta.isEnabled ? 'enabled' : 'disabled'}
+                            onChange={(e) => {
+                              const newMetadata = [...(activation.fieldMetadata || [])];
+                              newMetadata[metaIndex] = { ...meta, isEnabled: e.target.value === 'enabled' };
+                              updateActivation(index, { fieldMetadata: newMetadata });
+                            }}
+                            className="border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="enabled">Enabled</option>
+                            <option value="disabled">Disabled</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              const newMetadata = (activation.fieldMetadata || []).filter((_, i) => i !== metaIndex);
+                              updateActivation(index, { fieldMetadata: newMetadata });
+                            }}
+                            className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : null;
+                    })}
+                    {(!activation.fieldMetadata || activation.fieldMetadata.length === 0) && (
+                      <div className="text-xs text-gray-500 italic">No fields configured. Click &quot;Add All Fields&quot; or add individual fields below.</div>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const newMetadata = [...(activation.fieldMetadata || []), { fieldId: e.target.value, isEnabled: true }];
+                          updateActivation(index, { fieldMetadata: newMetadata });
+                        }
+                      }}
+                      className="border rounded px-2 py-1 text-sm"
+                    >
+                      <option value="">+ Add Field...</option>
+                      {config.fields
+                        .filter(f => !activation.fieldMetadata?.some(m => m.fieldId === f.id))
+                        .map(f => (
+                          <option key={f.id} value={f.id}>{f.label}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mb-4 p-3 bg-gray-50 rounded">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium">Controlled Groups</label>
+                    <button
+                      onClick={() => {
+                        const availableGroups = config.groups
+                          .filter(g => !activation.groupMetadata?.some(m => m.groupId === g.id))
+                          .map(g => ({ groupId: g.id, isEnabled: true }));
+                        updateActivation(index, { 
+                          groupMetadata: [...(activation.groupMetadata || []), ...availableGroups] 
+                        });
+                      }}
+                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      Add All Groups
+                    </button>
+                  </div>
+                  <div className="text-xs text-gray-600 mb-2">
+                    Manage which field groups this function can enable/disable when activated
+                  </div>
+                  <div className="space-y-2">
+                    {activation.groupMetadata?.map((meta, metaIndex) => {
+                      const group = config.groups.find(g => g.id === meta.groupId);
+                      return group ? (
+                        <div key={meta.groupId} className="flex items-center gap-2 bg-white p-2 rounded border">
+                          <span className="text-sm flex-1">{group.label} ({group.name})</span>
+                          <select
+                            value={meta.isEnabled ? 'enabled' : 'disabled'}
+                            onChange={(e) => {
+                              const newMetadata = [...(activation.groupMetadata || [])];
+                              newMetadata[metaIndex] = { ...meta, isEnabled: e.target.value === 'enabled' };
+                              updateActivation(index, { groupMetadata: newMetadata });
+                            }}
+                            className="border rounded px-2 py-1 text-sm"
+                          >
+                            <option value="enabled">Enabled</option>
+                            <option value="disabled">Disabled</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              const newMetadata = (activation.groupMetadata || []).filter((_, i) => i !== metaIndex);
+                              updateActivation(index, { groupMetadata: newMetadata });
+                            }}
+                            className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : null;
+                    })}
+                    {(!activation.groupMetadata || activation.groupMetadata.length === 0) && (
+                      <div className="text-xs text-gray-500 italic">No groups configured. Click &quot;Add All Groups&quot; or add individual groups below.</div>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const newMetadata = [...(activation.groupMetadata || []), { groupId: e.target.value, isEnabled: true }];
+                          updateActivation(index, { groupMetadata: newMetadata });
+                        }
+                      }}
+                      className="border rounded px-2 py-1 text-sm"
+                    >
+                      <option value="">+ Add Group...</option>
+                      {config.groups
+                        .filter(g => !activation.groupMetadata?.some(m => m.groupId === g.id))
+                        .map(g => (
+                          <option key={g.id} value={g.id}>{g.label}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="text-sm text-gray-600 mb-2">
                   Conditions: {activation.conditions.length} | Effects: {activation.effects.length}
                 </div>

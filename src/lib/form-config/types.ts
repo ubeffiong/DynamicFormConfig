@@ -42,6 +42,7 @@ export interface FormFieldConfig {
   visibility: FieldVisibility;
   order: number;
   groupId?: string;
+  isRemoved?: boolean;
 }
 
 export interface FieldGroupConfig {
@@ -52,10 +53,22 @@ export interface FieldGroupConfig {
   order: number;
   collapsible?: boolean;
   collapsed?: boolean;
+  isRemoved?: boolean;
+}
+
+export interface FunctionFieldMetadata {
+  fieldId: string;
+  isEnabled: boolean;
+}
+
+export interface FunctionGroupMetadata {
+  groupId: string;
+  isEnabled: boolean;
 }
 
 export interface SystemFunctionActivation {
   functionName: string;
+  description?: string;
   conditions: {
     fieldId: string;
     operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than';
@@ -65,6 +78,8 @@ export interface SystemFunctionActivation {
     fieldId: string;
     action: 'show' | 'hide' | 'enable' | 'disable' | 'require' | 'unrequire';
   }[];
+  fieldMetadata: FunctionFieldMetadata[];
+  groupMetadata: FunctionGroupMetadata[];
 }
 
 export interface FormConfig {

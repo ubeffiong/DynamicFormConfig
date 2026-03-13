@@ -70,8 +70,8 @@ export async function saveFormConfig(config: FormConfig): Promise<FormConfig> {
     formName: c.formName,
     description: c.description,
     isActive: c.isActive,
-    fieldCount: c.fields.length,
-    groupCount: c.groups.length,
+    fieldCount: c.fields.filter(f => !f.isRemoved).length,
+    groupCount: c.groups.filter(g => !g.isRemoved).length,
   }));
   
   saveStoredConfigs(configs);
@@ -88,8 +88,8 @@ export async function deleteFormConfig(configId: string): Promise<void> {
     formName: c.formName,
     description: c.description,
     isActive: c.isActive,
-    fieldCount: c.fields.length,
-    groupCount: c.groups.length,
+    fieldCount: c.fields.filter(f => !f.isRemoved).length,
+    groupCount: c.groups.filter(g => !g.isRemoved).length,
   }));
   saveStoredConfigs(configs);
 }
@@ -262,12 +262,15 @@ export function initializeSampleConfigs(): void {
     systemActivations: [
       {
         functionName: 'insurance_enabled',
+        description: 'Controls insurance-related fields visibility',
         conditions: [{ fieldId: 'hasInsurance', operator: 'equals', value: true }],
         effects: [
           { fieldId: 'insuranceProvider', action: 'show' },
           { fieldId: 'policyNumber', action: 'show' },
           { fieldId: 'groupNumber', action: 'show' },
         ],
+        fieldMetadata: [],
+        groupMetadata: [],
       },
     ],
   };
@@ -379,8 +382,8 @@ export function initializeSampleConfigs(): void {
     formName: c.formName,
     description: c.description,
     isActive: c.isActive,
-    fieldCount: c.fields.length,
-    groupCount: c.groups.length,
+    fieldCount: c.fields.filter(f => !f.isRemoved).length,
+    groupCount: c.groups.filter(g => !g.isRemoved).length,
   }));
   configs.activeFormKeys = configs.formConfigs.filter(c => c.isActive).map(c => c.formKey);
   

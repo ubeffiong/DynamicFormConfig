@@ -49,8 +49,8 @@ export function ConfiguredForm({ formKey, backendRequired = [], onSubmit, childr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formKey, backendRequired, applyConfig]);
 
-  const visibleFields = fields.filter(f => f.visibility === 'visible');
-  const visibleGroups = groups.filter(g => g.visibility === 'visible').sort((a, b) => a.order - b.order);
+  const visibleFields = fields.filter(f => f.visibility === 'visible' && !f.isRemoved);
+  const visibleGroups = groups.filter(g => g.visibility === 'visible' && !g.isRemoved).sort((a, b) => a.order - b.order);
 
   const getFieldsForGroup = (groupId: string) => {
     return visibleFields
